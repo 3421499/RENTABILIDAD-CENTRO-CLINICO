@@ -322,11 +322,8 @@ function setSaving(state) {
 
 // ── HISTORY SUBSCRIPTION ────────────────────────────────────────────────────
 function subscribeHistory() {
-  if (unsubHistory) unsubHistory();
-  const col = collection(db, 'users', currentUser.uid, 'months');
-  unsubHistory = onSnapshot(col, () => {
-    if (activeTab === 'historial') render();
-  });
+  // onSnapshot disabled — causes re-render on every save
+  // History tab loads fresh data on demand when tab is selected
 }
 
 // ── NAVIGATION ───────────────────────────────────────────────────────────────
