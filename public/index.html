@@ -421,8 +421,7 @@ async function renderSection(section) {
         </div>
         <div class="category-section">
           ${rows}
-          <button class="btn-add-entry" onclick="addEntry('${section}','${escAttr(cat)}')">＋ Agregar registro</button>
-        </div>
+          <button class="btn-add-entry" id="addbtn-${section}-${escAttr(cat)}" onclick="addEntry('${section}','${escAttr(cat)}')">＋ Agregar registro</button>        </div>
       </div>`;
   }).join('');
 }
