@@ -421,7 +421,8 @@ async function renderSection(section) {
         </div>
         <div class="category-section">
           ${rows}
-          <button class="btn-add-entry" id="addbtn-${section}-${escAttr(cat)}" onclick="addEntry('${section}','${escAttr(cat)}')">＋ Agregar registro</button>        </div>
+          <button class="btn-add-entry" id="addbtn-${section}-${escAttr(cat)}" onclick="addEntry('${section}','${escAttr(cat)}',this)">＋ Agregar registro</button>
+        </div>
       </div>`;
   }).join('');
 }
@@ -457,28 +458,25 @@ async function renderHistorial() {
 }
 
 // ── DATA OPS ─────────────────────────────────────────────────────────────────
-window.addEntry = async (section, cat) => {
+window.addEntry = async (section, cat, btnEl) => {
   const data = await loadMonth(currentYear, currentMonth);
   if (!data[section][cat]) data[section][cat] = [];
   const idx = data[section][cat].length;
   data[section][cat].push({ desc: '', amount: '' });
   scheduleSave(data);
-  const btnId = `addbtn-${section}-${cat}`;
-  const btn = document.getElementById(btnId);
-  if (btn) {
-    const div = document.createElement('div');
-    div.className = 'entry';
-    div.innerHTML = `
-      <input type="text" placeholder="Descripción"
-        oninput="updateEntry('${section}','${cat.replace(/'/g,"\\'")}',${idx},'desc',this.value)"/>
-      <input type="number" min="0" step="1" placeholder="0"
-        oninput="updateEntry('${section}','${cat.replace(/'/g,"\\'")}',${idx},'amount',this.value)"/>
-      <button class="entry-delete" onclick="deleteEntry('${section}','${cat.replace(/'/g,"\\'")}',${idx})">×</button>`;
-    btn.parentNode.insertBefore(div, btn);
-    div.querySelector('input[type=text]').focus();
-  }
+  const catKey = cat.replace(/'/g, "\\'");
+  const div = document.createElement('div');
+  div.className = 'entry';
+  div.innerHTML = `
+    <input type="text" placeholder="Descripción"
+      oninput="updateEntry('${section}','${catKey}',${idx},'desc',this.value)"/>
+    <input type="number" min="0" step="1" placeholder="0"
+      oninput="updateEntry('${section}','${catKey}',${idx},'amount',this.value)"/>
+    <button class="entry-delete" onclick="deleteEntry('${section}','${catKey}',${idx})">×</button>`;
+  btnEl.parentNode.insertBefore(div, btnEl);
+  div.querySelector('input[type=text]').focus();
 };
-  window.updateEntry = async (section, cat, idx, field, val) => {
+window.updateEntry = async (section, cat, idx, field, val) => {
   const data = await loadMonth(currentYear, currentMonth);
   if (data[section][cat]?.[idx] !== undefined) {
     data[section][cat][idx][field] = val;
