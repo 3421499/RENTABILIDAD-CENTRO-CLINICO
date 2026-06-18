@@ -411,7 +411,7 @@ async function renderSection(section) {
           oninput="updateEntry('${section}','${escAttr(cat)}',${i},'desc',this.value)"/>
         <input type="number" min="0" step="1" placeholder="0" value="${e.amount||''}"
           oninput="updateEntry('${section}','${escAttr(cat)}',${i},'amount',this.value)"/>
-        <button class="entry-delete" onclick="deleteEntry('${section}','${escAttr(cat)}',${i},this)">×</button>
+        <button class="entry-delete" type="button" onclick="event.stopPropagation();deleteEntry('${section}','${escAttr(cat)}',${i},this)">×</button>
       </div>`).join('');
     return `
       <div class="card">
@@ -421,7 +421,7 @@ async function renderSection(section) {
         </div>
         <div class="category-section">
           ${rows}
-          <button class="btn-add-entry" id="addbtn-${section}-${escAttr(cat)}" onclick="addEntry('${section}','${escAttr(cat)}',this)">＋ Agregar registro</button>
+          <button type="button" class="btn-add-entry" id="addbtn-${section}-${escAttr(cat)}" onclick="event.stopPropagation();addEntry('${section}','${escAttr(cat)}',this)">＋ Agregar registro</button>
         </div>
       </div>`;
   }).join('');
@@ -458,23 +458,30 @@ async function renderHistorial() {
 }
 
 // ── DATA OPS ─────────────────────────────────────────────────────────────────
+let _adding = false;
 window.addEntry = async (section, cat, btnEl) => {
-  const data = await loadMonth(currentYear, currentMonth);
-  if (!data[section][cat]) data[section][cat] = [];
-  const idx = data[section][cat].length;
-  data[section][cat].push({ desc: '', amount: '' });
-  scheduleSave(data);
-  const catKey = cat.replace(/'/g, "\\'");
-  const div = document.createElement('div');
-  div.className = 'entry';
-  div.innerHTML = `
-    <input type="text" placeholder="Descripción"
-      oninput="updateEntry('${section}','${catKey}',${idx},'desc',this.value)"/>
-    <input type="number" min="0" step="1" placeholder="0"
-      oninput="updateEntry('${section}','${catKey}',${idx},'amount',this.value)"/>
-    <button class="entry-delete" onclick="deleteEntry('${section}','${catKey}',${idx})">×</button>`;
-  btnEl.parentNode.insertBefore(div, btnEl);
-  div.querySelector('input[type=text]').focus();
+  if (_adding) return;
+  _adding = true;
+  try {
+    const data = await loadMonth(currentYear, currentMonth);
+    if (!data[section][cat]) data[section][cat] = [];
+    const idx = data[section][cat].length;
+    data[section][cat].push({ desc: '', amount: '' });
+    scheduleSave(data);
+    const catKey = cat.replace(/'/g, "\\'");
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.innerHTML = `
+      <input type="text" placeholder="Descripción"
+        oninput="updateEntry('${section}','${catKey}',${idx},'desc',this.value)"/>
+      <input type="number" min="0" step="1" placeholder="0"
+        oninput="updateEntry('${section}','${catKey}',${idx},'amount',this.value)"/>
+      <button type="button" class="entry-delete" onclick="event.stopPropagation();deleteEntry('${section}','${catKey}',${idx},this)">×</button>`;
+    btnEl.parentNode.insertBefore(div, btnEl);
+    div.querySelector('input[type=text]').focus();
+  } finally {
+    _adding = false;
+  }
 };
 window.updateEntry = async (section, cat, idx, field, val) => {
   const data = await loadMonth(currentYear, currentMonth);
@@ -486,16 +493,23 @@ window.updateEntry = async (section, cat, idx, field, val) => {
     if (subEl) subEl.textContent = fmt(sub);
   }
 };
+let _deleting = false;
 window.deleteEntry = async (section, cat, idx, btnEl) => {
-  const data = await loadMonth(currentYear, currentMonth);
-  if (data[section][cat]) {
-    data[section][cat].splice(idx, 1);
-    scheduleSave(data);
+  if (_deleting) return;
+  _deleting = true;
+  try {
     const row = btnEl.closest('.entry');
     if (row) row.remove();
-    const sub = sumEntries(data[section][cat]);
-    const subEl = document.getElementById('sub-' + section + '-' + cat);
-    if (subEl) subEl.textContent = '$' + Math.round(sub).toLocaleString('es-CL');
+    const data = await loadMonth(currentYear, currentMonth);
+    if (data[section][cat]) {
+      data[section][cat].splice(idx, 1);
+      scheduleSave(data);
+      const sub = sumEntries(data[section][cat]);
+      const subEl = document.getElementById('sub-' + section + '-' + cat);
+      if (subEl) subEl.textContent = '$' + Math.round(sub).toLocaleString('es-CL');
+    }
+  } finally {
+    _deleting = false;
   }
 };
 
