@@ -411,7 +411,7 @@ async function renderSection(section) {
           oninput="updateEntry('${section}','${escAttr(cat)}',${i},'desc',this.value)"/>
         <input type="number" min="0" step="1" placeholder="0" value="${e.amount||''}"
           oninput="updateEntry('${section}','${escAttr(cat)}',${i},'amount',this.value)"/>
-        <button class="entry-delete" onclick="deleteEntry('${section}','${escAttr(cat)}',${i})">×</button>
+        <button class="entry-delete" onclick="deleteEntry('${section}','${escAttr(cat)}',${i},this)">×</button>
       </div>`).join('');
     return `
       <div class="card">
@@ -486,12 +486,16 @@ window.updateEntry = async (section, cat, idx, field, val) => {
     if (subEl) subEl.textContent = fmt(sub);
   }
 };
-window.deleteEntry = async (section, cat, idx) => {
+window.deleteEntry = async (section, cat, idx, btnEl) => {
   const data = await loadMonth(currentYear, currentMonth);
   if (data[section][cat]) {
     data[section][cat].splice(idx, 1);
     scheduleSave(data);
-    render();
+    const row = btnEl.closest('.entry');
+    if (row) row.remove();
+    const sub = sumEntries(data[section][cat]);
+    const subEl = document.getElementById('sub-' + section + '-' + cat);
+    if (subEl) subEl.textContent = '$' + Math.round(sub).toLocaleString('es-CL');
   }
 };
 
