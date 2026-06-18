@@ -331,6 +331,7 @@ function subscribeHistory() {
 
 // ── NAVIGATION ───────────────────────────────────────────────────────────────
 window.changeMonth = (d) => {
+  invalidateCache();
   currentMonth += d;
   if (currentMonth > 11) { currentMonth = 0; currentYear++; }
   if (currentMonth < 0)  { currentMonth = 11; currentYear--; }
@@ -458,59 +459,75 @@ async function renderHistorial() {
 }
 
 // ── DATA OPS ─────────────────────────────────────────────────────────────────
-let _adding = false;
-window.addEntry = async (section, cat, btnEl) => {
-  if (_adding) return;
-  _adding = true;
-  try {
-    const data = await loadMonth(currentYear, currentMonth);
+// Local cache to avoid repeated Firestore reads
+let _monthCache = null;
+let _monthCacheKey = null;
+
+async function getMonthData() {
+  const key = monthKey(currentYear, currentMonth);
+  if (_monthCacheKey === key && _monthCache) return _monthCache;
+  _monthCache = await loadMonth(currentYear, currentMonth);
+  _monthCacheKey = key;
+  return _monthCache;
+}
+function invalidateCache() {
+  _monthCache = null;
+  _monthCacheKey = null;
+}
+
+window.addEntry = (section, cat, btnEl) => {
+  // 1. Update DOM immediately
+  const catKey = cat.replace(/'/g, "\'");
+  const csect = btnEl.parentNode;
+  const existingEntries = csect.querySelectorAll('.entry');
+  const idx = existingEntries.length;
+  const div = document.createElement('div');
+  div.className = 'entry';
+  div.innerHTML = `
+    <input type="text" placeholder="Descripción"
+      oninput="updateEntry('${section}','${catKey}',${idx},'desc',this.value)"/>
+    <input type="number" min="0" step="1" placeholder="0"
+      oninput="updateEntry('${section}','${catKey}',${idx},'amount',this.value)"/>
+    <button type="button" class="entry-delete" onclick="event.stopPropagation();deleteEntry('${section}','${catKey}',${idx},this)">×</button>`;
+  csect.insertBefore(div, btnEl);
+  div.querySelector('input[type=text]').focus();
+
+  // 2. Save to Firestore in background
+  getMonthData().then(data => {
     if (!data[section][cat]) data[section][cat] = [];
-    const idx = data[section][cat].length;
     data[section][cat].push({ desc: '', amount: '' });
     scheduleSave(data);
-    const catKey = cat.replace(/'/g, "\\'");
-    const div = document.createElement('div');
-    div.className = 'entry';
-    div.innerHTML = `
-      <input type="text" placeholder="Descripción"
-        oninput="updateEntry('${section}','${catKey}',${idx},'desc',this.value)"/>
-      <input type="number" min="0" step="1" placeholder="0"
-        oninput="updateEntry('${section}','${catKey}',${idx},'amount',this.value)"/>
-      <button type="button" class="entry-delete" onclick="event.stopPropagation();deleteEntry('${section}','${catKey}',${idx},this)">×</button>`;
-    btnEl.parentNode.insertBefore(div, btnEl);
-    div.querySelector('input[type=text]').focus();
-  } finally {
-    _adding = false;
-  }
+  });
 };
-window.updateEntry = async (section, cat, idx, field, val) => {
-  const data = await loadMonth(currentYear, currentMonth);
-  if (data[section][cat]?.[idx] !== undefined) {
+
+window.updateEntry = (section, cat, idx, field, val) => {
+  getMonthData().then(data => {
+    if (!data[section]) data[section] = {};
+    if (!data[section][cat]) data[section][cat] = [];
+    while (data[section][cat].length <= idx) data[section][cat].push({ desc: '', amount: '' });
     data[section][cat][idx][field] = val;
     scheduleSave(data);
     const sub = sumEntries(data[section][cat]);
-    const subEl = document.getElementById(`sub-${section}-${cat}`);
-    if (subEl) subEl.textContent = fmt(sub);
-  }
+    const subEl = document.getElementById('sub-' + section + '-' + cat);
+    if (subEl) subEl.textContent = '$' + Math.round(sub).toLocaleString('es-CL');
+  });
 };
-let _deleting = false;
-window.deleteEntry = async (section, cat, idx, btnEl) => {
-  if (_deleting) return;
-  _deleting = true;
-  try {
-    const row = btnEl.closest('.entry');
-    if (row) row.remove();
-    const data = await loadMonth(currentYear, currentMonth);
-    if (data[section][cat]) {
+
+window.deleteEntry = (section, cat, idx, btnEl) => {
+  // 1. Remove from DOM immediately
+  const row = btnEl.closest('.entry');
+  if (row) row.remove();
+
+  // 2. Save to Firestore in background
+  getMonthData().then(data => {
+    if (data[section] && data[section][cat]) {
       data[section][cat].splice(idx, 1);
       scheduleSave(data);
       const sub = sumEntries(data[section][cat]);
       const subEl = document.getElementById('sub-' + section + '-' + cat);
       if (subEl) subEl.textContent = '$' + Math.round(sub).toLocaleString('es-CL');
     }
-  } finally {
-    _deleting = false;
-  }
+  });
 };
 
 // ── CATEGORY MODAL ────────────────────────────────────────────────────────────
